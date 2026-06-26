@@ -1,0 +1,11 @@
+{
+  "name":"kantongkresek",
+  "version":"1.0.0",
+  "description":"KantongKresek Installer",
+  "type":"module",
+  "bin":{"kantongkresek":"index.js"},
+  "dependencies":{
+    "chalk":"^5.4.1",
+    "inquirer":"^12.6.3"
+  }
+}
