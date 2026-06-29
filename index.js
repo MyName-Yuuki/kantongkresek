@@ -23,7 +23,7 @@ const BRANCH      = 'main';
 const BASE_URL    = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${BRANCH}/scripts/`;
 const VERSION     = '1.3.1';
 
-// ---- Fetch latest version from remote (best effort) ----
+// ---- Fetch latest version from remote ----
 function fetchLatestVersion() {
   try {
     const raw = execSync(
@@ -32,13 +32,14 @@ function fetchLatestVersion() {
     ).toString().trim();
     return /^v?\d+(?:\.\d+){0,2}$/.test(raw) ? raw.replace(/^v/, '') : null;
   } catch {
-    return null;
+    return null; // return null if fetch fails, not a version string
   }
 }
-const LATEST_VERSION = fetchLatestVersion() || VERSION;
-const DISPLAY_VERSION = LATEST_VERSION === VERSION
+const REMOTE_VERSION = fetchLatestVersion(); // null if can't reach GitHub, otherwise a version string like '1.3.1'
+const HAS_UPDATE = REMOTE_VERSION !== null && REMOTE_VERSION !== VERSION; // only true if remote is different
+const DISPLAY_VERSION = REMOTE_VERSION === VERSION
   ? `v${VERSION}`
-  : `v${LATEST_VERSION} (this: v${VERSION})`;
+  : (REMOTE_VERSION ? `v${REMOTE_VERSION} (this: v${VERSION})` : `v${VERSION}  ☁  update-check unavailable`);
 
 const MENU = [
   {key: '1', label: 'Install Base',         desc: 'PHP, Java, MariaDB — Full Environment',     script: 'install_base.sh'},
@@ -286,11 +287,11 @@ async function ensureLicense() {
 }
 
 // ---- Self-update function ----
-async function selfUpdate() {
+async function selfUpdate(targetVersion) {
   try {
     console.log();
     console.log(boxen(
-      chalk.hex('#10B981').bold(`  ✦ Update ${VERSION} → ${LATEST_VERSION} available!`) + '\n' +
+      chalk.hex('#10B981').bold(`  ✦ Update ${VERSION} → ${targetVersion} available!`) + '\n' +
       chalk.gray('  Performing self-update via npm...') + '\n' +
       chalk.gray('  Please wait, do not close this window.'),
       {padding: 1, margin: 1, borderStyle: 'round', borderColor: '#10B981'}
@@ -306,7 +307,7 @@ async function selfUpdate() {
     console.log();
     console.log(boxen(
       chalk.hex('#10B981').bold('  ✓ Update successful!') + '\n' +
-      chalk.gray('  Version ') + chalk.green.bold(`v${LATEST_VERSION}`) + chalk.gray(' is now installed.') + '\n' +
+      chalk.gray('  Version ') + chalk.green.bold(`v${targetVersion}`) + chalk.gray(' is now installed.') + '\n' +
       chalk.gray('  To start, type: ') + chalk.yellow.bold('kantongkresek'),
       {padding: 1, margin: 1, borderStyle: 'round', borderColor: '#10B981'}
     ));
@@ -343,7 +344,7 @@ async function checkAndPromptUpdate(localVer, latestVer) {
   }]);
 
   if (confirm.trim().toLowerCase() === 'y' || confirm.trim().toLowerCase() === 'yes') {
-    await selfUpdate();
+    await selfUpdate(latestVer);
   } else {
     console.log();
   }
@@ -366,8 +367,8 @@ async function main() {
 
   // ---- UPDATE CHECK ----
   // If local version doesn't match latest, prompt for self-update
-  if (LATEST_VERSION !== VERSION && LATEST_VERSION !== 'none') {
-    await checkAndPromptUpdate(VERSION, LATEST_VERSION);
+  if (HAS_UPDATE && REMOTE_VERSION) {
+    await checkAndPromptUpdate(VERSION, REMOTE_VERSION);
   }
 
   // Build a license info object for the status bar
