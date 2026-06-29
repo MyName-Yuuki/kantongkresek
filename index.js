@@ -24,11 +24,11 @@ const BASE_URL    = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_R
 const VERSION     = '1.0.0';
 
 const MENU = [
-  {key: '1', label: 'Install Base',         desc: 'phpMyAdmin, Java, MariaDB',            script: 'install_base.sh'},
-  {key: '2', label: 'Configurations',       desc: 'Nginx + PHP-FPM + Packages',           scripts: ['configurations.sh', 'configurations_base_I.sh']},
-  {key: '3', label: 'Install Database',     desc: 'Provision database schema',            script: null},
-  {key: '4', label: 'Install SSL',          desc: 'Let\'s Encrypt via Certbot',           script: 'install_ssl_certbot.sh'},
-  {key: '0', label: 'Exit',                 desc: 'Close the installer',                  script: null},
+  {key: '1', label: 'Install Base',         desc: 'PHP, Java, MariaDB — Full Environment',     script: 'install_base.sh'},
+  {key: '2', label: 'Configurations',       desc: 'Nginx + PHP-FPM + Packages — Server Stack', scripts: ['configurations.sh', 'configurations_base_I.sh']},
+  {key: '3', label: 'Install Database',     desc: 'Provision Schema + Data — Auto Select',     script: null},
+  {key: '4', label: 'Install SSL',          desc: 'Let\'s Encrypt via Certbot — HTTPS Ready',  script: 'install_ssl_certbot.sh'},
+  {key: '0', label: 'Exit',                 desc: 'Close the installer',                       script: null},
 ];
 
 function pad(s, n) {
@@ -48,17 +48,31 @@ function banner(termWidth) {
       for (const line of logo.split('\n')) {
         lines.push(chalk.hex('#06B6D4').bold(line));
       }
+      lines.push(chalk.hex('#06B6D4').bold(`  Kantong Kresek Installer — Base, Lib, System for PWServer`));
       lines.push(chalk.gray(`  v${VERSION}  •  SSH Friendly  •  Server Deploy`));
       resolve(lines.join('\n'));
     });
   });
 }
 
-function statusBar(online) {
+function statusBar(online, license) {
+  // License status icon + label
+  const licBadge = license?.activated
+    ? chalk.hex('#10B981').bold('◆ ACTIVATED')
+    : license
+      ? chalk.hex('#F59E0B').bold('◇ LICENSE')
+      : chalk.hex('#EF4444').bold('○ UNLICENSED');
+
+  const licType = license?.activated
+    ? chalk.hex('#10B981')(license.type || 'permanent')
+    : chalk.gray('—');
+
   const items = [
-    (online ? chalk.hex('#10B981').bold('● ONLINE') : chalk.hex('#EF4444').bold('● OFFLINE')),
+    licBadge,
     chalk.gray('•'),
-    chalk.hex('#10B981').bold(`user:${process.env.USER || 'Kantong'}`),
+    licType,
+    chalk.gray('•'),
+    chalk.hex('#06B6D4').bold(`user:${process.env.USER || 'Kantong'}`),
     chalk.gray('•'),
     chalk.hex('#F59E0B').bold(`host:${process.env.HOSTNAME || 'Kresek'}`),
     chalk.gray('•'),
@@ -67,24 +81,25 @@ function statusBar(online) {
   return boxen(items.join('  '), {
     padding: {left: 1, right: 1},
     borderStyle: 'single',
-    borderColor: online ? '#10B981' : '#EF4444',
+    borderColor: license?.activated ? '#10B981' : (online ? '#7C3AED' : '#EF4444'),
   });
 }
 
 function menuPanel(termWidth) {
-  const W = Math.min(termWidth - 6, 62);
+  const W = Math.min(termWidth - 6, 68);
   const items = MENU.map(it => {
     const key = chalk.hex('#F59E0B').bold(`[${it.key}]`);
     const name = chalk.bold(pad(it.label, 20));
-    const sep = chalk.gray('·');
+    const sep = chalk.hex('#7C3AED')('◆');
     const desc = chalk.gray(it.desc);
     return `  ${key} ${name} ${sep} ${desc}`;
   });
-  const separator = chalk.gray('  ' + '─'.repeat(W - 4));
+  const separator = chalk.hex('#7C3AED').dim('  ' + '─'.repeat(W - 4));
   const footer = chalk.gray(`  ${'↑/↓ to navigate  •  Enter to select  •  or type the number'}`);
 
   return boxen([
-    chalk.hex('#F59E0B').bold('  ✦ MAIN MENU'),
+    chalk.hex('#F59E0B').bold('  ✦ MAIN MENU') + chalk.gray(`  ·  Kantong Kresek Installer Base, Lib, System`),
+    chalk.hex('#9CA3AF')('      Base For PWServer'),
     separator,
     ...items,
     separator,
@@ -268,16 +283,27 @@ async function main() {
     process.exit(1);
   }
 
+  // Build a license info object for the status bar
+  const licenseInfo = (() => {
+    const lic = loadLicense();
+    if (!lic) return { activated: false, type: null };
+    return {
+      activated: true,
+      type: lic.expiresAt ? 'temporary' : 'permanent',
+      expiresAt: lic.expiresAt || null,
+    };
+  })();
+
   console.clear();
   console.log(await banner(termWidth));
   console.log();
-  console.log(statusBar(online));
+  console.log(statusBar(online, licenseInfo));
 
   while (true) {
     console.clear();
     console.log(await banner(termWidth));
     console.log();
-    console.log(statusBar(online));
+    console.log(statusBar(online, licenseInfo));
     console.log(menuPanel(termWidth));
 
     const {menu} = await inquirer.prompt([{
