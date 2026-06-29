@@ -21,7 +21,7 @@ const GITHUB_USER = 'MyName-Yuuki';
 const GITHUB_REPO = 'kantongkresek';
 const BRANCH      = 'main';
 const BASE_URL    = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${BRANCH}/scripts/`;
-const VERSION     = '1.3.7';
+const VERSION     = '1.3.8';
 
 // ---- Fetch latest version from remote ----
 function fetchLatestVersion() {
@@ -431,8 +431,8 @@ async function main() {
     if (menu === '3') {
       console.log();
       const DB_CHOICES = [
-        {key: '1', file: 'ykpw144-155.sql',  label: '14*-155 database',     desc: 'Schema + procedures (pw_new compatible)'},
-        {key: '2', file: 'ykpw16*-17*.sql',   label: '16*-17_ Database',     desc: 'Schema only (ykpw compatible)'},
+        {key: '1', file: 'ykpw144-155.sql',  label: '144-155 database',     desc: 'Schema + procedures (pw_new compatible)'},
+        {key: '2', file: 'ykpw160-170.sql',  label: '160-170 Database',     desc: 'Schema only (ykpw compatible)'},
       ];
       const {dbChoice} = await inquirer.prompt([{
         type: 'list',

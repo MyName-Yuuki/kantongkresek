@@ -87,9 +87,14 @@ fi
 SQL_DIR="/opt/Github/KantongKresek/databases_sql"
 SQL_PATH="$SQL_DIR/$DB_FILE"
 
-# Handle wildcard globbing
+# Handle wildcard globbing — but only expand if literal file with that exact name doesn't exist
 if [[ "$DB_FILE" == *"*"* ]]; then
-    SQL_PATH=$(ls "$SQL_DIR"/$DB_FILE 2>/dev/null | head -1)
+    if [ -f "$SQL_PATH" ]; then
+        : # literal filename matches, no expansion needed
+    else
+        # shellcheck disable=SC2086
+        SQL_PATH=$(ls $SQL_DIR/$DB_FILE 2>/dev/null | head -1)
+    fi
 fi
 
 if [ ! -f "$SQL_PATH" ]; then
