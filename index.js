@@ -111,59 +111,61 @@ async function checkOnline() {
 
 function runScripts(scripts) {
   const list = Array.isArray(scripts) ? scripts : [scripts];
+  const promises = [];
+
   for (const entry of list) {
     const name = typeof entry === 'string' ? entry : entry.script;
-    const args = typeof entry === 'object' && entry.args ? ' ' + entry.args.map(a => `"${a.replace(/"/g, '\\\\"')}"`).join(' ') : '';
+    const argList = typeof entry === 'object' && entry.args ? entry.args : [];
     const spinner = ora({
       text: '  ' + chalk.cyan.bold('▶ FETCHING') + '  ' + chalk.yellow(name),
       color: 'cyan',
       spinner: 'dots',
     }).start();
 
-    const t0 = hrtime.bigint();
-    try {
-      if (args) {
-        // Fetch remote script to temp, then run with args
-        const tmpDir = os.tmpdir();
-        const tmpFile = `${tmpDir}/${name}.${Date.now()}.sh`;
-        const dlUrl = `${BASE_URL}${name}`;
+    const promise = (async () => {
+      const t0 = hrtime.bigint();
+      const dlUrl = `${BASE_URL}${name}`;
 
-        execSync(`curl -fsSL "${dlUrl}" -o "${tmpFile}" 2>/dev/null`);
+      try {
+        if (argList.length > 0) {
+          // Fetch remote script to temp, run with args
+          const tmpDir = os.tmpdir();
+          const tmpFile = `${tmpDir}/${name}.${Date.now()}.sh`;
+          execSync(`curl -fsSL "${dlUrl}" -o "${tmpFile}" 2>/dev/null`);
 
-        const ms = Number(hrtime.bigint() - t0) / 1e6;
-        spinner.succeed(
-          chalk.hex('#10B981').bold('  ✓ ' + name) +
-          chalk.gray(`  (${(ms / 1000).toFixed(1)}s)`)
-        );
-
-        const child = spawn(`bash ${tmpFile}${args}`, {
-          shell: true,
-          stdio: 'inherit',
-        });
-        return new Promise((resolve, reject) => {
-          child.on('close', (code) => {
-            fs.unlink(tmpFile, () => {});
-            if (code !== 0) reject(new Error(`Exit code ${code}`));
-            else resolve();
+          await new Promise((resolve, reject) => {
+            const child = spawn('bash', [tmpFile, ...argList], {
+              stdio: 'inherit',
+            });
+            child.on('close', (code) => {
+              fs.unlink(tmpFile, () => {});
+              if (code !== 0) reject(new Error(`Exit code ${code}`));
+              else resolve();
+            });
+            child.on('error', reject);
           });
-          child.on('error', reject);
-        });
-      } else {
-        execSync(`bash <(curl -fsSL ${BASE_URL}${name})`, {
-          stdio: 'inherit',
-          shell: '/bin/bash',
-        });
+        } else {
+          // No args: pipe through curl | bash
+          execSync(`bash <(curl -fsSL "${dlUrl}")`, {
+            stdio: 'inherit',
+            shell: '/bin/bash',
+          });
+        }
         const ms = Number(hrtime.bigint() - t0) / 1e6;
         spinner.succeed(
           chalk.hex('#10B981').bold('  ✓ ' + name) +
           chalk.gray(`  (${(ms / 1000).toFixed(1)}s)`)
         );
+      } catch (e) {
+        spinner.fail(chalk.hex('#EF4444').bold('  ✗ ' + name));
+        throw e;
       }
-    } catch (e) {
-      spinner.fail(chalk.hex('#EF4444').bold('  ✗ ' + name));
-      throw e;
-    }
+    })();
+
+    promises.push(promise);
   }
+
+  return Promise.all(promises);
 }
 
 async function footerPrompt() {
