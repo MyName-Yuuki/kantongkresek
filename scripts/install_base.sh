@@ -108,10 +108,8 @@ run_cmd() {
     shift
     "$@" >/dev/null 2>&1 &
     local pid=$!
-    spinner "$pid
-"
-    wait "$pid
-"
+    spinner "$pid"
+    wait "$pid"
     local rc=$?
     if [ $rc -eq 0 ]; then
         print_success "$desc"

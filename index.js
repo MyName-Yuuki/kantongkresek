@@ -6,6 +6,9 @@ import figlet from 'figlet';
 import ora from 'ora';
 import {execSync} from 'child_process';
 import {hrtime} from 'process';
+import os from 'os';
+import fs from 'fs';
+import {spawn} from 'child_process';
 import {
   generateLicense,
   verifyLicense,
@@ -110,7 +113,7 @@ function runScripts(scripts) {
   const list = Array.isArray(scripts) ? scripts : [scripts];
   for (const entry of list) {
     const name = typeof entry === 'string' ? entry : entry.script;
-    const args = typeof entry === 'object' && entry.args ? ' ' + entry.args.map(a => `"${a.replace(/"/g, '\\"')}"`).join(' ') : '';
+    const args = typeof entry === 'object' && entry.args ? ' ' + entry.args.map(a => `"${a.replace(/"/g, '\\\\"')}"`).join(' ') : '';
     const spinner = ora({
       text: '  ' + chalk.cyan.bold('▶ FETCHING') + '  ' + chalk.yellow(name),
       color: 'cyan',
@@ -119,15 +122,43 @@ function runScripts(scripts) {
 
     const t0 = hrtime.bigint();
     try {
-      execSync(`bash <(curl -fsSL ${BASE_URL}${name})${args}`, {
-        stdio: 'inherit',
-        shell: '/bin/bash',
-      });
-      const ms = Number(hrtime.bigint() - t0) / 1e6;
-      spinner.succeed(
-        chalk.hex('#10B981').bold('  ✓ ' + name) +
-        chalk.gray(`  (${(ms / 1000).toFixed(1)}s)`)
-      );
+      if (args) {
+        // Fetch remote script to temp, then run with args
+        const tmpDir = os.tmpdir();
+        const tmpFile = `${tmpDir}/${name}.${Date.now()}.sh`;
+        const dlUrl = `${BASE_URL}${name}`;
+
+        execSync(`curl -fsSL "${dlUrl}" -o "${tmpFile}" 2>/dev/null`);
+
+        const ms = Number(hrtime.bigint() - t0) / 1e6;
+        spinner.succeed(
+          chalk.hex('#10B981').bold('  ✓ ' + name) +
+          chalk.gray(`  (${(ms / 1000).toFixed(1)}s)`)
+        );
+
+        const child = spawn(`bash ${tmpFile}${args}`, {
+          shell: true,
+          stdio: 'inherit',
+        });
+        return new Promise((resolve, reject) => {
+          child.on('close', (code) => {
+            fs.unlink(tmpFile, () => {});
+            if (code !== 0) reject(new Error(`Exit code ${code}`));
+            else resolve();
+          });
+          child.on('error', reject);
+        });
+      } else {
+        execSync(`bash <(curl -fsSL ${BASE_URL}${name})`, {
+          stdio: 'inherit',
+          shell: '/bin/bash',
+        });
+        const ms = Number(hrtime.bigint() - t0) / 1e6;
+        spinner.succeed(
+          chalk.hex('#10B981').bold('  ✓ ' + name) +
+          chalk.gray(`  (${(ms / 1000).toFixed(1)}s)`)
+        );
+      }
     } catch (e) {
       spinner.fail(chalk.hex('#EF4444').bold('  ✗ ' + name));
       throw e;
