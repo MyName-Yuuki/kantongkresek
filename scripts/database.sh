@@ -98,10 +98,24 @@ if [[ "$DB_FILE" == *"*"* ]]; then
 fi
 
 if [ ! -f "$SQL_PATH" ]; then
-    print_error "Database file not found: $SQL_PATH"
-    print_info "Available files in $SQL_DIR:"
-    ls -1 "$SQL_DIR"/*.sql 2>/dev/null | xargs -I{} basename {}
-    exit 1
+    # Try to auto-download from kresek.my.id (fallback for npm-installed packages)
+    print_warn "Database file not found locally. Attempting download..."
+    mkdir -p "$SQL_DIR"
+    if command -v curl >/dev/null 2>&1; then
+        if curl -fsSL --max-time 60 -o "$SQL_PATH" "https://kresek.my.id/dl/$DB_FILE"; then
+            print_step "Downloaded $DB_FILE from kresek.my.id"
+        else
+            print_error "Database file not found and download failed: $SQL_PATH"
+            print_info "Available files in $SQL_DIR:"
+            ls -1 "$SQL_DIR"/*.sql 2>/dev/null | xargs -I{} basename {}
+            exit 1
+        fi
+    else
+        print_error "Database file not found: $SQL_PATH"
+        print_info "Available files in $SQL_DIR:"
+        ls -1 "$SQL_DIR"/*.sql 2>/dev/null | xargs -I{} basename {}
+        exit 1
+    fi
 fi
 
 print_step "Installing Database"

@@ -21,7 +21,7 @@ const GITHUB_USER = 'MyName-Yuuki';
 const GITHUB_REPO = 'kantongkresek';
 const BRANCH      = 'main';
 const BASE_URL    = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${BRANCH}/scripts/`;
-const VERSION     = '1.4.0';
+const VERSION     = '1.4.1';
 
 // ---- Fetch latest version from remote ----
 function fetchLatestVersion() {
@@ -288,6 +288,59 @@ async function ensureLicense() {
   }
 }
 
+// ---- Ensure database files exist (download from kresek.my.id if missing) ----
+async function ensureDatabases(online) {
+  const DB_DIR = '/opt/Github/KantongKresek/databases_sql';
+  const DB_FILES = [
+    {file: 'ykpw144-155.sql', url: 'https://kresek.my.id/dl/ykpw144-155.sql'},
+    {file: 'ykpw160-170.sql', url: 'https://kresek.my.id/dl/ykpw160-170.sql'},
+  ];
+
+  try { execSync(`mkdir -p "${DB_DIR}"`, {stdio: 'pipe'}); } catch {}
+
+  const missing = DB_FILES.filter(d => {
+    try { return !existsSync(`${DB_DIR}/${d.file}`); } catch { return true; }
+  });
+
+  if (missing.length === 0) return;
+
+  if (!online) {
+    console.log();
+    console.log(boxen(
+      chalk.hex('#F59E0B').bold('  ⚠ Database files missing') + '\n' +
+      chalk.gray(`  ${missing.length} file(s) not found in ${DB_DIR}`) + '\n' +
+      chalk.gray('  Offline — cannot auto-download. Run menu 3 once online.'),
+      {padding: 1, margin: 1, borderStyle: 'round', borderColor: '#F59E0B'}
+    ));
+    console.log();
+    return;
+  }
+
+  console.log();
+  console.log(boxen(
+    chalk.hex('#F59E0B').bold('  ⚠ Database files missing — downloading...') + '\n' +
+    chalk.gray(`  Source: https://kresek.my.id/dl/`) + '\n' +
+    chalk.gray(`  Target: ${DB_DIR}`),
+    {padding: 1, margin: 1, borderStyle: 'round', borderColor: '#F59E0B'}
+  ));
+  console.log();
+
+  for (const d of missing) {
+    const spinner = ora(`  Downloading ${d.file}...`).start();
+    try {
+      execSync(`curl -fsSL --max-time 60 -o "${DB_DIR}/${d.file}" "${d.url}"`, {
+        stdio: 'pipe', shell: '/bin/bash',
+      });
+      spinner.succeed(chalk.green(`  Downloaded ${d.file}`));
+    } catch (e) {
+      spinner.fail(chalk.red(`  Failed to download ${d.file}`));
+      console.log(chalk.gray(`     url: ${d.url}`));
+      console.log(chalk.gray('     Will retry when you select menu 3.'));
+    }
+  }
+  console.log();
+}
+
 // ---- Self-update function ----
 async function selfUpdate(targetVersion) {
   try {
@@ -355,8 +408,11 @@ async function checkAndPromptUpdate(localVer, latestVer) {
 }
 
 async function main() {
-  const termWidth = process.stdout.columns || 80;
+  const termWidth = process.stdout.columns || 0;
   const online = await checkOnline();
+
+  // ---- ENSURE DATABASE FILES (fallback download from kresek.my.id) ----
+  await ensureDatabases(online);
 
   // ---- LICENSE GATE ----
   const activated = await ensureLicense();
