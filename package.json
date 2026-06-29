@@ -1,11 +1,52 @@
 {
   "name": "kantongkresek",
   "version": "1.0.0",
-  "description": "KantongKresek Installer",
+  "description": "Interactive SSH-friendly CLI installer that bootstraps a Debian server with phpMyAdmin, Nginx + PHP-FPM, Java, and MariaDB.",
   "type": "module",
   "bin": {
     "kantongkresek": "index.js"
   },
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MyName-Yuuki/kantongkresek.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MyName-Yuuki/kantongkresek/issues"
+  },
+  "homepage": "https://github.com/MyName-Yuuki/kantongkresek#readme",
+  "keywords": [
+    "installer",
+    "debian",
+    "server",
+    "nginx",
+    "php-fpm",
+    "mariadb",
+    "phpmyadmin",
+    "java",
+    "cli",
+    "ssh",
+    "setup",
+    "bootstrap"
+  ],
+  "author": {
+    "name": "MyName-Yuuki",
+    "url": "https://github.com/MyName-Yuuki"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "index.js",
+    "lib/",
+    "scripts/",
+    "README.md",
+    "LICENSE"
+  ],
   "dependencies": {
     "boxen": "^8.0.1",
     "chalk": "^5.4.1",
