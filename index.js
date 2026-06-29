@@ -23,7 +23,7 @@ const VERSION     = '1.0.0';
 const MENU = [
   {key: '1', label: 'Install Base',         desc: 'phpMyAdmin, Java, MariaDB',            script: 'install_base.sh'},
   {key: '2', label: 'Configurations',       desc: 'Nginx + PHP-FPM + Packages',           scripts: ['configurations.sh', 'configurations_base_I.sh']},
-  {key: '3', label: 'Install Database',     desc: 'Provision database schema',            script: 'database.sh'},
+  {key: '3', label: 'Install Database',     desc: 'Provision database schema',            script: null},
   {key: '4', label: 'Install SSL',          desc: 'Let\'s Encrypt via Certbot',           script: 'install_ssl_certbot.sh'},
   {key: '0', label: 'Exit',                 desc: 'Close the installer',                  script: null},
 ];
@@ -108,7 +108,9 @@ async function checkOnline() {
 
 function runScripts(scripts) {
   const list = Array.isArray(scripts) ? scripts : [scripts];
-  for (const name of list) {
+  for (const entry of list) {
+    const name = typeof entry === 'string' ? entry : entry.script;
+    const args = typeof entry === 'object' && entry.args ? ' ' + entry.args.map(a => `"${a.replace(/"/g, '\\"')}"`).join(' ') : '';
     const spinner = ora({
       text: '  ' + chalk.cyan.bold('▶ FETCHING') + '  ' + chalk.yellow(name),
       color: 'cyan',
@@ -117,7 +119,7 @@ function runScripts(scripts) {
 
     const t0 = hrtime.bigint();
     try {
-      execSync(`bash <(curl -fsSL ${BASE_URL}${name})`, {
+      execSync(`bash <(curl -fsSL ${BASE_URL}${name})${args}`, {
         stdio: 'inherit',
         shell: '/bin/bash',
       });
@@ -275,6 +277,43 @@ async function main() {
     }
 
     const found = MENU.find(m => m.key === menu);
+
+    // Menu 3: sub-pick database version before running
+    if (menu === '3') {
+      console.log();
+      const DB_CHOICES = [
+        {key: '1', file: 'ykpw144-155.sql',  label: '14*-155 database',     desc: 'Schema + procedures (pw_new compatible)'},
+        {key: '2', file: 'ykpw16*-17*.sql',   label: '16*-17_ Database',     desc: 'Schema only (ykpw compatible)'},
+      ];
+      const {dbChoice} = await inquirer.prompt([{
+        type: 'list',
+        name: 'dbChoice',
+        message: chalk.hex('#7C3AED').bold('  Pilih database yang akan di-install:'),
+        pageSize: DB_CHOICES.length + 2,
+        choices: [
+          ...DB_CHOICES.map(d => ({
+            name: `${chalk.hex('#F59E0B').bold(`[${d.key}] `)}${chalk.bold(pad(d.label, 18))} ${chalk.gray('· ' + d.desc)}`,
+            value: d.file,
+          })),
+          {name: chalk.gray('  ↩ Cancel (back to menu)'), value: '__cancel'},
+        ],
+      }]);
+      if (dbChoice === '__cancel') {
+        await footerPrompt();
+        continue;
+      }
+
+      console.log(chalk.gray(`\n  Running: Install Database (${dbChoice})\n`));
+      try {
+        await runScripts([{script: 'database.sh', args: [dbChoice]}]);
+        console.log(chalk.hex('#10B981').bold('\n  ✓ Done!'));
+      } catch (e) {
+        console.log(chalk.hex('#EF4444').bold('\n  ✗ Script aborted.\n'));
+      }
+      await footerPrompt();
+      continue;
+    }
+
     const target = found?.script || found?.scripts;
     if (!target) {
       console.log(chalk.red('  Unknown menu option.\n'));

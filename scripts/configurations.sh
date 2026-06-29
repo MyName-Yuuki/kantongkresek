@@ -1,56 +1,154 @@
 #!/bin/bash
 
-RED='\033[1;31m'
-GREEN='\033[1;32m'
-BLUE='\033[1;34m'
+# ============================================================
+# configurations.sh — Nginx + PHP-FPM
+# UI palette matches index.js (npm installer)
+# ============================================================
+
+PURPLE='\033[38;2;124;58;237m'
+CYAN='\033[38;2;6;182;212m'
+GREEN='\033[38;2;16;185;129m'
+YELLOW='\033[38;2;245;158;11m'
+RED='\033[38;2;239;68;68m'
+GRAY='\033[38;2;156;163;175m'
+WHITE='\033[38;2;229;231;235m'
+BG_PURPLE='\033[48;2;124;58;237m'
+BOLD='\033[1m'
 RESET='\033[0m'
-BOX='\033[1;44m'
 
-print_box(){ echo -e "\n${BOX} $1 ${RESET}\n"; }
-print_success(){ echo -e "${GREEN}[OK] $1${RESET}"; }
-print_error(){ echo -e "${RED}[ERROR] $1${RESET}"; }
-print_warn(){ echo -e "${BLUE}? $1${RESET}"; }
-
-run_cmd(){
-    bash -c "$1" >/dev/null 2>&1
-    if [ $? -eq 0 ]; then
-        print_success "$2"
-    else
-        print_error "$2"
-        exit 1
-    fi
+print_box() {
+    local title="$1"
+    local width=${2:-62}
+    printf "\n${PURPLE}╭─ ${CYAN}${BOLD}%s${RESET}${PURPLE} $(printf '─%.0s' $(seq 1 $(( width - ${#title} - 4 ))))╮${RESET}\n" "$title"
 }
 
-[ "$(id -u)" != "0" ] && { echo "Run as root"; exit 1; }
+print_box_close() {
+    local width=${1:-62}
+    printf "${PURPLE}╰$(printf '─%.0s' $(seq 1 $width))╯${RESET}\n"
+}
 
-print_box "Configuring Nginx + PHP-FPM"
+print_step() {
+    printf "${CYAN}${BOLD}◆ %s${RESET}\n" "$1"
+}
 
-# Stop & Remove Apache (jika ada)
-run_cmd "systemctl stop apache2 2>/dev/null || true" "Stopped Apache"
-run_cmd "systemctl disable apache2 2>/dev/null || true" "Disabled Apache"
-run_cmd "apt purge -y apache2 apache2-bin apache2-data apache2-utils >/dev/null 2>&1 || true" "Removed Apache"
+print_success() {
+    printf "  ${GREEN}${BOLD}✔ %s${RESET}\n" "$1"
+}
 
-# Enable PHP-FPM
-run_cmd "systemctl enable php8.4-fpm" "Enabled PHP-FPM"
-run_cmd "systemctl restart php8.4-fpm" "Started PHP-FPM"
+print_error() {
+    printf "  ${RED}${BOLD}✖ %s${RESET}\n" "$1"
+}
 
-# Ensure document root exists
+print_warn() {
+    printf "  ${YELLOW}${BOLD}⚠ %s${RESET}\n" "$1"
+}
+
+print_info() {
+    printf "  ${CYAN}${BOLD}▶ %s${RESET}\n" "$1"
+}
+
+print_dim() {
+    printf "  ${GRAY}%s${RESET}\n" "$1"
+}
+
+spinner() {
+    local pid=$1
+    local delay=0.08
+    local spinstr='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    local i=0
+    tput civis 2>/dev/null
+    while ps -p "$pid" > /dev/null 2>&1; do
+        local char=${spinstr:$i:1}
+        printf "\r  ${CYAN}${BOLD}%s${RESET}  ${GRAY}working...${RESET}" "$char"
+        i=$(( (i + 1) % ${#spinstr} ))
+        sleep $delay
+    done
+    tput cnorm 2>/dev/null
+    printf "\r"
+}
+
+run_cmd() {
+    local desc="$1"
+    shift
+    "$@" >/dev/null 2>&1 &
+    local pid=$!
+    spinner "$pid"
+    wait "$pid"
+    local rc=$?
+    if [ $rc -eq 0 ]; then
+        print_success "$desc"
+    else
+        print_error "$desc"
+    fi
+    return $rc
+}
+
+[ "$(id -u)" != "0" ] && { print_error "Must run as root"; exit 1; }
+
+# ============================================================
+# Banner
+# ============================================================
+clear
+echo
+printf "${PURPLE}${BOLD}"
+cat <<'BANNER'
+  ██╗  ██╗ █████╗ ███╗   ██╗████████╗ ██████╗ ███╗   ██╗ ██████╗
+  ██║ ██╔╝██╔══██╗████╗  ██║╚══██╔══╝██╔═══██╗████╗  ██║██╔════╝
+  ██████╔╝ ███████║██╔██╗ ██║   ██║   ██║   ██║██╔██╗ ██║██║  ███╗
+  ██╔═██╗ ██╔══██║██║╚██╗██║   ██║   ██║   ██║██║╚██╗██║██║   ██║
+  ██║  ██╗██║  ██║██║ ╚████║   ██║   ╚██████╔╝██║ ╚████║╚██████╔╝
+  ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝   ╚═╝    ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝
+BANNER
+printf "${RESET}\n"
+printf "  ${CYAN}${BOLD}INSTALLER${RESET}  ${GRAY}•  ${YELLOW}SSH Friendly${RESET}  ${GRAY}•  ${GREEN}Server Deploy${RESET}\n"
+printf "  ${GRAY}v1.1.1${RESET}\n"
+echo
+print_box "  KANTONGKRESEK INSTALLER  "
+
+# ============================================================
+# SECTION 1: Remove Apache
+# ============================================================
+print_step "Removing Apache (switching to Nginx)..."
+
+run_cmd "Stopped Apache" systemctl stop apache2 2>/dev/null || true
+run_cmd "Disabled Apache" systemctl disable apache2 2>/dev/null || true
+run_cmd "Removed Apache packages" apt purge -y apache2 apache2-bin apache2-data apache2-utils >/dev/null 2>&1 || true
+
+print_box_close 62
+
+# ============================================================
+# SECTION 2: Enable PHP-FPM
+# ============================================================
+print_box "PHP-FPM Configuration" 62
+
+print_info "Enabling PHP-FPM service"
+run_cmd "PHP-FPM enabled" systemctl enable php8.4-fpm
+run_cmd "PHP-FPM restarted" systemctl restart php8.4-fpm
+
+print_info "Creating document root"
 WEB_ROOT="/usr/src/.main/public"
-run_cmd "mkdir -p $WEB_ROOT && chown -R www-data:www-data $WEB_ROOT" "Created $WEB_ROOT"
+run_cmd "Created $WEB_ROOT" bash -c "mkdir -p $WEB_ROOT && chown -R www-data:www-data $WEB_ROOT"
 
-# Placeholder index
+print_info "Writing placeholder index.php"
 cat > $WEB_ROOT/index.php <<'INDEXEOF'
 <?php
 echo '<h1>KantongKresek</h1>';
 echo '<p>Document root: /usr/src/.main/public</p>';
 echo '<p>phpMyAdmin: <a href="/dbkantong">/dbkantong</a></p>';
 INDEXEOF
-run_cmd "chown www-data:www-data $WEB_ROOT/index.php" "Set permissions on index.php"
+run_cmd "Set index.php permissions" chown www-data:www-data $WEB_ROOT/index.php
 
-# Backup konfigurasi lama
-[ -f /etc/nginx/sites-available/default ] && \
-mv /etc/nginx/sites-available/default /etc/nginx/sites-available/default.bak
+print_box_close 62
 
+# ============================================================
+# SECTION 3: Nginx configuration
+# ============================================================
+print_box "Nginx Configuration" 62
+
+print_info "Backing up old config"
+[ -f /etc/nginx/sites-available/default ] && mv /etc/nginx/sites-available/default /etc/nginx/sites-available/default.bak
+
+print_info "Writing Nginx config"
 cat > /etc/nginx/sites-available/default << 'EOF'
 server {
 
@@ -130,17 +228,38 @@ server {
 }
 EOF
 
-# Enable site
-run_cmd "ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default" "Enabled Nginx Site"
+print_info "Testing Nginx configuration"
+run_cmd "Nginx configuration valid" nginx -t
 
-# Test konfigurasi
-run_cmd "nginx -t" "Nginx Configuration OK"
+print_info "Enabling Nginx site"
+run_cmd "Symlinked Nginx site" ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
 
-# Enable nginx
-run_cmd "systemctl enable nginx" "Enabled Nginx"
+print_info "Enabling Nginx service"
+run_cmd "Nginx enabled" systemctl enable nginx
 
-# Restart nginx
-run_cmd "systemctl restart nginx" "Restarted Nginx"
+print_info "Restarting Nginx"
+run_cmd "Nginx restarted" systemctl restart nginx
 
 print_success "Nginx + PHP-FPM configured successfully"
-print_warn "Document root: $WEB_ROOT"
+print_box_close 62
+
+# ============================================================
+# SUMMARY
+# ============================================================
+echo
+printf "${PURPLE}${BOLD}"
+cat <<'BANNER'
+  ██╗  ██╗ █████╗ ███╗   ██╗████████╗ ██████╗ ███╗   ██╗ ██████╗
+  ██║ ██╔╝██╔══██╗████╗  ██║╚══██╔══╝██╔═══██╗████╗  ██║██╔════╝
+  ██████╔╝ ███████║██╔██╗ ██║   ██║   ██║   ██║██╔██╗ ██║██║  ███╗
+  ██╔═██╗ ██╔══██║██║╚██╗██║   ██║   ██║   ██║██║╚██╗██║██║   ██║
+  ██║  ██╗██║  ██║██║ ╚████║   ██║   ╚██████╔╝██║ ╚████║╚██████╔╝
+  ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝   ╚═╝    ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝
+BANNER
+printf "${RESET}\n"
+printf "  ${GREEN}${BOLD}✓ INSTALLATION COMPLETE${RESET}\n"
+echo
+print_success "Nginx + PHP-FPM configured successfully."
+print_dim "Document root: $WEB_ROOT"
+print_dim "Next step: choose menu option 2 (Configurations)"
+echo
