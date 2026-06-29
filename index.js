@@ -258,9 +258,12 @@ async function main() {
     }]);
 
     if (menu === '0') {
+      // Clear license on exit — next run requires re-entry
+      try { clearLicense(); } catch {}
       console.log();
       console.log(boxen(
-        chalk.hex('#10B981').bold('  Thanks for using KantongKresek. Goodbye!'),
+        chalk.hex('#10B981').bold('  Thanks for using KantongKresek. Goodbye!') + '\n' +
+        chalk.gray('  License cleared — you will need to activate again next time.'),
         {
           padding: 1,
           margin: 1,
