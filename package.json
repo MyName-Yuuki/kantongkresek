@@ -1,6 +1,6 @@
 {
   "name": "kantongkresek",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Interactive SSH-friendly CLI installer that bootstraps a Debian server with phpMyAdmin, Nginx + PHP-FPM, Java, and MariaDB.",
   "type": "module",
   "bin": {
