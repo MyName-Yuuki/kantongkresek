@@ -21,25 +21,35 @@ const GITHUB_USER = 'MyName-Yuuki';
 const GITHUB_REPO = 'kantongkresek';
 const BRANCH      = 'main';
 const BASE_URL    = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${BRANCH}/scripts/`;
-const VERSION     = '1.3.3';
+const VERSION     = '1.3.4';
 
 // ---- Fetch latest version from remote ----
 function fetchLatestVersion() {
   try {
     const raw = execSync(
-      `curl -fsSL --max-time 5 https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${BRANCH}/version.txt`,
+      `curl -fsSL --max-time 15 https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${BRANCH}/version.txt`,
       {stdio: 'pipe', shell: '/bin/bash'}
     ).toString().trim();
-    return /^v?\d+(?:\.\d+){0,2}$/.test(raw) ? raw.replace(/^v/, '') : null;
+    return /^\d+(?:\.\d+){0,2}$/.test(raw) ? raw : null;
   } catch {
-    return null; // return null if fetch fails, not a version string
+    return null;
   }
 }
-const REMOTE_VERSION = fetchLatestVersion(); // null if can't reach GitHub, otherwise a version string like '1.3.1'
-const HAS_UPDATE = REMOTE_VERSION !== null && REMOTE_VERSION !== VERSION; // only true if remote is different
+const REMOTE_VERSION = fetchLatestVersion(); // null if unreachable, otherwise '1.3.x'
+const HAS_UPDATE = REMOTE_VERSION !== null && REMOTE_VERSION !== VERSION;
 const DISPLAY_VERSION = REMOTE_VERSION === VERSION
   ? `v${VERSION}`
-  : (REMOTE_VERSION ? `v${REMOTE_VERSION} (this: v${VERSION})` : `v${VERSION}  ☁  update-check unavailable`);
+  : (REMOTE_VERSION
+      ? `v${REMOTE_VERSION} (this: v${VERSION})`
+      : `v${VERSION}  ☁  update-check unavailable`);
+
+const REMOTE_VERSION = fetchLatestVersion(); // null if can't reach GitHub, otherwise version string
+const HAS_UPDATE = REMOTE_VERSION !== null && REMOTE_VERSION !== VERSION;
+const DISPLAY_VERSION = REMOTE_VERSION === VERSION
+  ? `v${VERSION}`
+  : (REMOTE_VERSION
+      ? `v${REMOTE_VERSION} (this: v${VERSION})`
+      : `v${VERSION}  ☁  update-check unavailable`);
 
 const MENU = [
   {key: '1', label: 'Install Base',         desc: 'PHP, Java, MariaDB — Full Environment',     script: 'install_base.sh'},
