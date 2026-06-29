@@ -17,6 +17,7 @@ const MENU = [
   {key: '1', label: 'Install Base',         desc: 'phpMyAdmin, Java, MariaDB',            script: 'install_base.sh'},
   {key: '2', label: 'Configurations',       desc: 'Nginx + PHP-FPM + Packages',           scripts: ['configurations.sh', 'configurations_base_I.sh']},
   {key: '3', label: 'Install Database',     desc: 'Provision database schema',            script: 'database.sh'},
+  {key: '4', label: 'Install SSL',          desc: 'Let\'s Encrypt via Certbot',           script: 'install_ssl_certbot.sh'},
   {key: '0', label: 'Exit',                 desc: 'Close the installer',                  script: null},
 ];
 
@@ -47,11 +48,11 @@ function statusBar(online) {
   const items = [
     (online ? chalk.hex('#10B981').bold('● ONLINE') : chalk.hex('#EF4444').bold('● OFFLINE')),
     chalk.gray('•'),
-    chalk.hex('#10B981').bold(`user:${process.env.USER || 'root'}`),
+    chalk.hex('#10B981').bold(`user:${process.env.USER || 'Kantong'}`),
     chalk.gray('•'),
-    chalk.hex('#F59E0B').bold(`host:${process.env.HOSTNAME || 'localhost'}`),
+    chalk.hex('#F59E0B').bold(`host:${process.env.HOSTNAME || 'Kresek'}`),
     chalk.gray('•'),
-    chalk.hex('#9CA3AF').bold(`${GITHUB_USER}/${GITHUB_REPO}`),
+    chalk.hex('#9CA3AF').bold(`s/${GITHUB_REPO}`),
   ];
   return boxen(items.join('  '), {
     padding: {left: 1, right: 1},

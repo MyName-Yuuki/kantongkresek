@@ -32,30 +32,43 @@ echo "phpmyadmin phpmyadmin/dbconfig-install boolean false" | debconf-set-select
 run_cmd "apt update" "APT updated"
 run_cmd "apt install -y phpmyadmin php-mbstring php-zip php-gd php-json php-curl php-xml unzip" "phpMyAdmin installed"
 
-print_box "Configure Nginx"
+# Make sure /var/lib/phpmyadmin/tmp exists and is writable
+run_cmd "mkdir -p /var/lib/phpmyadmin/tmp" "Created phpMyAdmin tmp dir"
+run_cmd "chown -R www-data:www-data /var/lib/phpmyadmin" "Set ownership on phpMyAdmin data dir"
+
+print_box "Configure Nginx for phpMyAdmin (alias /dbkantong)"
+
+# Remove old snippet if any
+rm -f /etc/nginx/snippets/phpmyadmin-dbkantong.conf
 
 cat >/etc/nginx/snippets/phpmyadmin-dbkantong.conf <<'EOF'
+# phpMyAdmin served from /dbkantong
 location /dbkantong {
-    alias /usr/share/phpmyadmin;
+    alias /usr/share/phpmyadmin/;
     index index.php;
 
-    location ~ ^/dbkantong/(.+\.php)$ {
+    # Static assets
+    location ~ ^/dbkantong/(.+.(jpg|jpeg|gif|css|png|js|ico|html|xml|txt|svg|woff|woff2|ttf))$ {
         alias /usr/share/phpmyadmin/$1;
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/run/php/php8.4-fpm.sock;
-        fastcgi_param SCRIPT_FILENAME /usr/share/phpmyadmin/$1;
-        include fastcgi_params;
+        access_log off;
+        expires 30d;
     }
 
-    location ~* ^/dbkantong/(.+\.(jpg|jpeg|gif|css|png|js|ico|html|xml|txt))$ {
+    # PHP handling - rewrite to real phpMyAdmin path
+    location ~ ^/dbkantong/(.+)$ {
         alias /usr/share/phpmyadmin/$1;
+        fastcgi_pass unix:/run/php/php8.4-fpm.sock;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+        fastcgi_read_timeout 300;
     }
 }
 EOF
 
+# Ensure snippet is included in default server block
 if ! grep -q "phpmyadmin-dbkantong.conf" /etc/nginx/sites-available/default; then
-    sed -i '/server_name _;/a\
-    include snippets/phpmyadmin-dbkantong.conf;' /etc/nginx/sites-available/default
+    sed -i '/server_name _;/a\    include snippets/phpmyadmin-dbkantong.conf;' /etc/nginx/sites-available/default
 fi
 
 run_cmd "nginx -t" "Nginx configuration valid"
@@ -66,26 +79,28 @@ print_box "Configure Java"
 
 JAVA_HOME="/home/tomcat9/java11"
 
-[ ! -x "$JAVA_HOME/bin/java" ] && { print_error "Java not found"; exit 1; }
-
-cat >/etc/profile.d/java11.sh <<EOF
+if [ ! -x "$JAVA_HOME/bin/java" ]; then
+    print_warn "Java not found at $JAVA_HOME - skipping Java config"
+else
+    cat >/etc/profile.d/java11.sh <<EOF
 export JAVA_HOME=$JAVA_HOME
 export PATH=\$JAVA_HOME/bin:\$PATH
 EOF
 
-chmod +x /etc/profile.d/java11.sh
+    chmod +x /etc/profile.d/java11.sh
 
-update-alternatives --install /usr/bin/java java $JAVA_HOME/bin/java 2000
-[ -f "$JAVA_HOME/bin/javac" ] && update-alternatives --install /usr/bin/javac javac $JAVA_HOME/bin/javac 2000
-[ -f "$JAVA_HOME/bin/jar" ] && update-alternatives --install /usr/bin/jar jar $JAVA_HOME/bin/jar 2000
-[ -f "$JAVA_HOME/bin/keytool" ] && update-alternatives --install /usr/bin/keytool keytool $JAVA_HOME/bin/keytool 2000
+    update-alternatives --install /usr/bin/java java $JAVA_HOME/bin/java 2000
+    [ -f "$JAVA_HOME/bin/javac" ] && update-alternatives --install /usr/bin/javac javac $JAVA_HOME/bin/javac 2000
+    [ -f "$JAVA_HOME/bin/jar" ] && update-alternatives --install /usr/bin/jar jar $JAVA_HOME/bin/jar 2000
+    [ -f "$JAVA_HOME/bin/keytool" ] && update-alternatives --install /usr/bin/keytool keytool $JAVA_HOME/bin/keytool 2000
 
-update-alternatives --set java $JAVA_HOME/bin/java
-[ -f "$JAVA_HOME/bin/javac" ] && update-alternatives --set javac $JAVA_HOME/bin/javac
-[ -f "$JAVA_HOME/bin/jar" ] && update-alternatives --set jar $JAVA_HOME/bin/jar
-[ -f "$JAVA_HOME/bin/keytool" ] && update-alternatives --set keytool $JAVA_HOME/bin/keytool
+    update-alternatives --set java $JAVA_HOME/bin/java
+    [ -f "$JAVA_HOME/bin/javac" ] && update-alternatives --set javac $JAVA_HOME/bin/javac
+    [ -f "$JAVA_HOME/bin/jar" ] && update-alternatives --set jar $JAVA_HOME/bin/jar
+    [ -f "$JAVA_HOME/bin/keytool" ] && update-alternatives --set keytool $JAVA_HOME/bin/keytool
 
-print_success "Java configured"
+    print_success "Java configured"
+fi
 
 print_box "Configure MariaDB"
 
@@ -105,4 +120,5 @@ echo " phpMyAdmin : http://SERVER-IP/dbkantong"
 echo " MySQL User : kantong"
 echo " Password   : kresek"
 echo " JAVA_HOME  : /home/tomcat9/java11"
+echo " Web root   : /usr/src/.main/public"
 echo "====================================="

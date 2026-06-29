@@ -37,7 +37,7 @@ progress_bar() {
     while [ $i -le $total ]; do
         sleep 0.05
         printf "["
-        for ((j=0; j<=i; j++)); do printf "¦"; done
+        for ((j=0; j<=i; j++)); do printf "ï¿½"; done
         for ((j=i; j<total; j++)); do printf " "; done
         printf "] %d%%\r" $(( i * 100 / total ))
         ((i++))
@@ -86,7 +86,7 @@ run_cmd "apt update -y" "Repository list updated"
 required_packages1=(mc screen htop mono-complete exim4 p7zip-full libpcap-dev curl wget ipset net-tools tzdata ntpdate mariadb-server mariadb-client)
 required_packages2=(make gcc g++ libssl-dev:i386 libssl-dev libcrypto++-dev libpcre3 libpcre3-dev libpcre3:i386 libpcre3-dev:i386 libtesseract-dev libx11-dev:i386 libx11-dev gcc-multilib libc6-dev:i386 build-essential gcc-multilib g++-multilib libtemplate-plugin-xml-perl libxml2-dev libxml2-dev:i386 libxml2:i386 libstdc++6:i386 libmariadb-dev-compat:i386 libmariadb-dev:i386)
 required_packages3=(make gcc g++ libssl-dev libcrypto++-dev libpcre3 libpcre3-dev libtesseract-dev libx11-dev gcc-multilib libc6-dev build-essential g++-multilib libtemplate-plugin-xml-perl libxml2-dev libstdc++6 libmariadb-dev-compat libmariadb-dev cmake)
-required_packages4=(php8.4 libapache2-mod-php8.4 php8.4-cli php8.4-fpm php8.4-json php8.4-pdo php8.4-zip php8.4-gd php8.4-mbstring php8.4-curl php8.4-xml php-pear php8.4-bcmath php8.4-cgi php8.4-mysqli php8.4-common php-phpseclib php8.4-mysql)
+required_packages4=(php8.4 php8.4-cli php8.4-fpm php8.4-json php8.4-pdo php8.4-zip php8.4-gd php8.4-mbstring php8.4-curl php8.4-xml php-pear php8.4-bcmath php8.4-cgi php8.4-mysqli php8.4-common php-phpseclib php8.4-mysql)
 
 print_box "?? Installing required packages"
 
@@ -95,7 +95,10 @@ for pkg in "${required_packages2[@]}"; do run_cmd "apt -y install $pkg" "Install
 for pkg in "${required_packages3[@]}"; do run_cmd "apt -y install $pkg" "Installed $pkg"; done
 for pkg in "${required_packages4[@]}"; do run_cmd "apt -y install $pkg" "Installed PHP package: $pkg"; done
 
-# Enable Apache rewrite
-run_cmd "a2enmod rewrite && systemctl restart apache2" "Apache rewrite module enabled and restarted"
+# Restart Nginx + PHP-FPM (Apache tidak dipakai, pakai Nginx dari konfigurasi)
+run_cmd "systemctl enable php8.4-fpm" "Enabled PHP-FPM"
+run_cmd "systemctl restart php8.4-fpm" "Restarted PHP-FPM"
+run_cmd "systemctl enable nginx" "Enabled Nginx"
+run_cmd "systemctl restart nginx" "Restarted Nginx"
 
 print_box "? INSTALLATION COMPLETE"
