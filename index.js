@@ -21,7 +21,7 @@ const GITHUB_USER = 'MyName-Yuuki';
 const GITHUB_REPO = 'kantongkresek';
 const BRANCH      = 'main';
 const BASE_URL    = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${BRANCH}/scripts/`;
-const VERSION     = '1.3.0';
+const VERSION     = '1.3.1';
 
 // ---- Fetch latest version from remote (best effort) ----
 function fetchLatestVersion() {
