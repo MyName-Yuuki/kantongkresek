@@ -1,7 +1,7 @@
 {
   "name": "kantongkresek",
-  "version": "1.1.1",
-  "description": "Interactive SSH-friendly CLI installer that bootstraps a Debian server with phpMyAdmin, Nginx + PHP-FPM, Java, MariaDB, and Let's Encrypt SSL. License-protected (universal key).",
+  "version": "1.2.0",
+  "description": "Kantong Kresek Installer Base, Lib, System — Base for PWServer. Interactive SSH-friendly CLI bootstrapping phpMyAdmin, Nginx + PHP-FPM, Java, MariaDB, Let's Encrypt SSL. License-protected (universal key).",
   "type": "module",
   "bin": {
     "kantongkresek": "index.js"
@@ -47,6 +47,7 @@
     "index.js",
     "lib/",
     "scripts/",
+    "version.txt",
     "README.md",
     "LICENSE"
   ],
