@@ -1,6 +1,6 @@
 {
   "name": "kantongkresek",
-  "version": "1.3.8",
+  "version": "1.3.9",
   "description": "Kantong Kresek Installer Base, Lib, System — Base for PWServer. Interactive SSH-friendly CLI bootstrapping phpMyAdmin, Nginx + PHP-FPM, Java, MariaDB, Let's Encrypt SSL. License-protected (universal key).",
   "type": "module",
   "bin": {

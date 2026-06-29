@@ -21,7 +21,7 @@ const GITHUB_USER = 'MyName-Yuuki';
 const GITHUB_REPO = 'kantongkresek';
 const BRANCH      = 'main';
 const BASE_URL    = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${BRANCH}/scripts/`;
-const VERSION     = '1.3.8';
+const VERSION     = '1.3.9';
 
 // ---- Fetch latest version from remote ----
 function fetchLatestVersion() {
@@ -300,26 +300,28 @@ async function selfUpdate(targetVersion) {
     ));
     console.log();
 
-    // npm update — run synchronously with inherit stdio
-    execSync(`npm update -g kantongkresek 2>&1`, {
+    // Pin to specific version (most reliable, bypasses "latest" tag issues)
+    execSync(`npm install -g kantongkresek@${targetVersion} 2>&1`, {
       stdio: 'inherit',
       shell: '/bin/bash',
+      timeout: 120000,
     });
 
     console.log();
     console.log(boxen(
       chalk.hex('#10B981').bold('  ✓ Update successful!') + '\n' +
       chalk.gray('  Version ') + chalk.green.bold(`v${targetVersion}`) + chalk.gray(' is now installed.') + '\n' +
-      chalk.gray('  To start, type: ') + chalk.yellow.bold('kantongkresek'),
+      chalk.gray('  Restart: ') + chalk.yellow.bold('kantongkresek'),
       {padding: 1, margin: 1, borderStyle: 'round', borderColor: '#10B981'}
     ));
     console.log();
+    await new Promise(r => setTimeout(r, 2000));
     process.exit(0);
   } catch (e) {
     console.log();
     console.log(boxen(
       chalk.hex('#EF4444').bold('  ✗ Update failed. Please update manually:') + '\n' +
-      chalk.gray('  Run: ') + chalk.white.bold('npm update -g kantongkresek'),
+      chalk.gray('  Run: ') + chalk.white.bold(`npm install -g kantongkresek@${targetVersion}`),
       {padding: 1, margin: 1, borderStyle: 'round', borderColor: '#EF4444'}
     ));
     console.log();
