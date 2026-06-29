@@ -21,7 +21,7 @@ const GITHUB_USER = 'MyName-Yuuki';
 const GITHUB_REPO = 'kantongkresek';
 const BRANCH      = 'main';
 const BASE_URL    = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${BRANCH}/scripts/`;
-const VERSION     = '1.0.0';
+const VERSION     = '1.3.0';
 
 // ---- Fetch latest version from remote (best effort) ----
 function fetchLatestVersion() {
@@ -285,6 +285,70 @@ async function ensureLicense() {
   }
 }
 
+// ---- Self-update function ----
+async function selfUpdate() {
+  try {
+    console.log();
+    console.log(boxen(
+      chalk.hex('#10B981').bold(`  ✦ Update ${VERSION} → ${LATEST_VERSION} available!`) + '\n' +
+      chalk.gray('  Performing self-update via npm...') + '\n' +
+      chalk.gray('  Please wait, do not close this window.'),
+      {padding: 1, margin: 1, borderStyle: 'round', borderColor: '#10B981'}
+    ));
+    console.log();
+
+    // npm update — run synchronously with inherit stdio
+    execSync(`npm update -g kantongkresek 2>&1`, {
+      stdio: 'inherit',
+      shell: '/bin/bash',
+    });
+
+    console.log();
+    console.log(boxen(
+      chalk.hex('#10B981').bold('  ✓ Update successful!') + '\n' +
+      chalk.gray('  Version ') + chalk.green.bold(`v${LATEST_VERSION}`) + chalk.gray(' is now installed.') + '\n' +
+      chalk.gray('  To start, type: ') + chalk.yellow.bold('kantongkresek'),
+      {padding: 1, margin: 1, borderStyle: 'round', borderColor: '#10B981'}
+    ));
+    console.log();
+    process.exit(0);
+  } catch (e) {
+    console.log();
+    console.log(boxen(
+      chalk.hex('#EF4444').bold('  ✗ Update failed. Please update manually:') + '\n' +
+      chalk.gray('  Run: ') + chalk.white.bold('npm update -g kantongkresek'),
+      {padding: 1, margin: 1, borderStyle: 'round', borderColor: '#EF4444'}
+    ));
+    console.log();
+    await new Promise(r => setTimeout(r, 3000));
+  }
+}
+
+async function checkAndPromptUpdate(localVer, latestVer) {
+  // Only prompt once per session — no spam on menu refresh
+  console.log();
+  console.log(boxen(
+    chalk.yellow.bold('  ⚑ Update Available!') + '\n' +
+    chalk.gray('  Current version: ') + chalk.green(`v${localVer}`) + '\n' +
+    chalk.gray('  Latest version:  ') + chalk.cyan(`v${latestVer}`) + '\n' +
+    chalk.gray('  Run ' + chalk.yellow.bold('self-update') + ' to get the latest version?') + '\n' +
+    chalk.gray('  Press Enter to skip for now.'),
+    {padding: 1, margin: 1, borderStyle: 'round', borderColor: '#F59E0B'}
+  ));
+
+  const {confirm} = await inquirer.prompt([{
+    type: 'input',
+    name: 'confirm',
+    message: chalk.yellow.bold('  Update now? (y/N): '),
+  }]);
+
+  if (confirm.trim().toLowerCase() === 'y' || confirm.trim().toLowerCase() === 'yes') {
+    await selfUpdate();
+  } else {
+    console.log();
+  }
+}
+
 async function main() {
   const termWidth = process.stdout.columns || 80;
   const online = await checkOnline();
@@ -298,6 +362,12 @@ async function main() {
       {padding: 1, margin: 1, borderStyle: 'round', borderColor: '#EF4444'}
     ));
     process.exit(1);
+  }
+
+  // ---- UPDATE CHECK ----
+  // If local version doesn't match latest, prompt for self-update
+  if (LATEST_VERSION !== VERSION && LATEST_VERSION !== 'none') {
+    await checkAndPromptUpdate(VERSION, LATEST_VERSION);
   }
 
   // Build a license info object for the status bar
