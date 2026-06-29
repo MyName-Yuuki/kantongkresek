@@ -121,7 +121,14 @@ fi
 print_step "Installing Database"
 print_info "File: $SQL_PATH ($(du -h "$SQL_PATH" | cut -f1))"
 print_info "Size: $(wc -l < "$SQL_PATH") lines"
-echo
+
+# Fix DEFINER references in SQL: 'kantor' → 'kantong' (single sed pass)
+if grep -q "DEFINER=.*kantor" "$SQL_PATH" 2>/dev/null; then
+    FIXED_SQL=$(mktemp /tmp/kresek_db_XXXXXX.sql)
+    sed 's/DEFINER=`kantor`@/DEFINER=`kantong`@/g; s/DEFINER='\''kantor'\''@/DEFINER='\''kantong'\''@/g; s/DEFINER="kantor"@/DEFINER="kantong"@/g' "$SQL_PATH" > "$FIXED_SQL"
+    SQL_PATH="$FIXED_SQL"
+    print_info "Fixed DEFINER references (kantor → kantong) in stored procedures"
+fi
 
 # ============================================================
 # Step 1: Stop MySQL if running (clean start)
@@ -180,7 +187,7 @@ print_info "Creating mysql credentials file..."
 mkdir -p ~/.ssh/.mysql_backup
 cat > /root/.my.cnf <<'MYCNF'
 [client]
-user=kantor
+user=kantong
 password=kresek
 MYCNF
 chmod 600 /root/.my.cnf
@@ -205,6 +212,37 @@ fi
 print_box_close 62
 
 # ============================================================
+# Step 5: Create MySQL user 'kantong'@localhost and 'kantong'@'%'
+# ============================================================
+print_box "5/5 — Create MySQL User" 62
+
+if [ "$PW_NEW_EXISTS" -gt 0 ]; then
+    DB_NAME="pw_new"
+else
+    DB_NAME="ykpw"
+fi
+
+print_info "Creating user 'kantong'@'localhost' and 'kantong'@'%'..."
+mysql -u root <<EOSQL 2>/dev/null
+CREATE USER IF NOT EXISTS 'kantong'@'localhost' IDENTIFIED BY 'kresek';
+CREATE USER IF NOT EXISTS 'kantong'@'%'         IDENTIFIED BY 'kresek';
+ALTER USER 'kantong'@'localhost' IDENTIFIED BY 'kresek';
+ALTER USER 'kantong'@'%'         IDENTIFIED BY 'kresek';
+GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO 'kantong'@'localhost';
+GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO 'kantong'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON \`mysql\`.\`proc\` TO 'kantong'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON \`mysql\`.\`proc\` TO 'kantong'@'%';
+FLUSH PRIVILEGES;
+EOSQL
+
+if [ $? -eq 0 ]; then
+    print_success "User 'kantong' created/updated (localhost + %) with password 'kresek'"
+else
+    print_warn "User creation had issues — check manually"
+fi
+print_box_close 62
+
+# ============================================================
 # SUMMARY
 # ============================================================
 echo
@@ -224,7 +262,7 @@ print_success "Database installed from: $SQL_PATH"
 echo
 printf "  ${PURPLE}┌─────────────────────── ${GRAY}Summary ──────────────────────${PURPLE}┐${RESET}\n"
 printf "  ${PURPLE}│${GRAY} File          : ${CYAN}$DB_FILE${RESET}\n"
-printf "  ${PURPLE}│${GRAY} MySQL User    : ${CYAN}kantor${RESET}\n"
+printf "  ${PURPLE}│${GRAY} MySQL User    : ${CYAN}kantong${RESET}\n"
 printf "  ${PURPLE}│${GRAY} Config        : ${CYAN}~/.my.cnf${RESET}\n"
 printf "  ${PURPLE}│${GRAY} Credential    : ${CYAN}kresek${RESET}\n"
 printf "  ${PURPLE}└──────────────────────────────────────────────────────${PURPLE}┘${RESET}\n"
