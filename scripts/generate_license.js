@@ -1,14 +1,12 @@
 #!/usr/bin/env node
-// generate_license.js — License key generator for KantongKresek
-// Usage: node scripts/generate_license.js [fingerprint-hex] [secret]
+// generate_license.js — Universal license key generator for KantongKresek
+// Usage:
+//   node scripts/generate_license.js --owner "Customer Name" [--expiry 365] [--count 1] [--secret <secret>]
+//   node scripts/generate_license.js --no-expiry --owner "Customer Name"
 //
-// Without args: auto-detect fingerprint from this machine
-// With args: generate key for a specific fingerprint (useful for remote activation)
+// Output goes to stdout. Supports batch generation with --count.
 
-import {execSync} from 'child_process';
-import {createHash} from 'crypto';
-import {readFileSync, existsSync} from 'fs';
-import {generateLicense, fingerprintFromData, getFingerprint} from '../lib/license.js';
+import {generateLicense} from '../lib/license.js';
 import chalk from 'chalk';
 
 const BR = chalk.bgHex('#7C3AED').hex('#FFFFFF').bold;
@@ -18,67 +16,83 @@ const YL = chalk.hex('#F59E0B');
 const RD = chalk.hex('#EF4444');
 const GM = chalk.gray;
 
+function parseArgs(argv) {
+  const out = {owner: null, expiry: null, count: 1, secret: null};
+  for (let i = 2; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--owner' || a === '-o') out.owner = argv[++i];
+    else if (a === '--expiry' || a === '-e') out.expiry = parseInt(argv[++i], 10);
+    else if (a === '--no-expiry') out.expiry = 0;
+    else if (a === '--count' || a === '-c') out.count = parseInt(argv[++i], 10) || 1;
+    else if (a === '--secret' || a === '-s') out.secret = argv[++i];
+    else if (a === '--help' || a === '-h') {
+      printHelp();
+      process.exit(0);
+    } else if (!out.owner) {
+      out.owner = a;
+    }
+  }
+  return out;
+}
+
+function printHelp() {
+  console.log(`
+${BR('  KANTONGKRESEK LICENSE GENERATOR  ')}
+
+Usage:
+  node scripts/generate_license.js [options]
+
+Options:
+  -o, --owner <name>     Owner / customer name (required)
+  -e, --expiry <days>    Expiry in days (e.g. 365 for 1 year)
+      --no-expiry        License never expires
+  -c, --count <n>        Generate N keys (default: 1)
+  -s, --secret <secret>  Override the signing secret
+  -h, --help             Show this help
+
+Examples:
+  node scripts/generate_license.js --owner "PT. ABC"
+  node scripts/generate_license.js --owner "Toko X" --expiry 365
+  node scripts/generate_license.js --owner "Bulk" --no-expiry --count 10
+
+Environment:
+  KANTONGKRESEK_SECRET     Override signing secret
+`);
+}
+
+const args = parseArgs(process.argv);
+
 console.log();
 console.log(BR('  KANTONGKRESEK LICENSE GENERATOR  '));
-console.log(GM('  Generate a license key for KantongKresek installation\n'));
+console.log(GM('  Generate universal license keys\n'));
 
-// --- Determine fingerprint ---
-let fpData;
-const argFp = process.argv[2];
-
-if (argFp) {
-  // Manual fingerprint provided
-  const clean = argFp.toLowerCase().replace(/[^a-f0-9]/g, '');
-  if (clean.length < 16) {
-    console.error(RD('  Error: fingerprint hex must be at least 16 chars'));
-    process.exit(1);
-  }
-  fpData = {hostname: 'remote', mac: 'manual', machineId: clean};
-  console.log(YL('  Manual fingerprint mode'));
-  console.log(GM('  Fingerprint: ' + clean.slice(0, 24) + '...\n'));
-} else {
-  // Auto-detect from this machine
-  fpData = getFingerprint();
-  if (!fpData.hostname && !fpData.mac && !fpData.machineId) {
-    // Fallback: use hostname as machine id
-    fpData.hostname = execSync('hostname', {encoding: 'utf8'}).trim();
-    fpData.machineId = fpData.hostname;
-  }
-  console.log(GN('  Auto-detected from this machine'));
-  console.log(GM(`  Hostname: ${fpData.hostname || '(unknown)'}`));
-  console.log(GM(`  MAC:      ${fpData.mac || '(unknown)'}`));
-  console.log(GM(`  MachineID: ${fpData.machineId || '(unknown)'}`));
-  console.log();
+if (!args.owner) {
+  console.log(RD('  Error: --owner <name> is required'));
+  printHelp();
+  process.exit(1);
 }
 
-// Compute SHA-256 fingerprint
-const fpHex = fingerprintFromData(fpData);
-console.log(GM('  SHA256 fingerprint: ' + fpHex));
+const secret = args.secret || process.env.KANTONGKRESEK_SECRET || undefined;
+
+console.log(GM(`  Owner     : ${args.owner}`));
+console.log(GM(`  Expiry    : ${args.expiry === 0 ? 'never' : (args.expiry ? args.expiry + ' days' : 'never')}`));
+console.log(GM(`  Count     : ${args.count}`));
+console.log(GM(`  Secret    : ${secret ? 'custom' : 'default'}`));
 console.log();
 
-// Secret
-const secret = process.argv[3] || process.env.KANTONGKRESEK_SECRET || 'KK-DEV-SECRET-7c3aed06b6d4f59e0b1a2c3d4e5f6a7b';
-if (process.argv[3]) {
-  console.log(YL('  Using custom secret'));
-} else {
-  console.log(GM('  Using default secret'));
-  console.log(GM('  Override with: KANTONGKRESEK_SECRET=<secret> or pass as arg 3\n'));
+for (let i = 0; i < args.count; i++) {
+  const expiryArg = args.expiry === 0 ? null : args.expiry;
+  const lic = generateLicense({
+    owner: args.count > 1 ? `${args.owner} #${i + 1}` : args.owner,
+    expiryDays: expiryArg,
+    secret,
+  });
+
+  console.log(YL(`  ${lic.key}`));
+  console.log(GM(`  └─ issued ${lic.issuedAt}${lic.expiresAt ? ' → expires ' + lic.expiresAt : ' → never expires'}`));
 }
 
-// Generate
-const key = generateLicense(fpHex, secret);
-
 console.log();
-console.log(BR('  GENERATED LICENSE KEY  '));
-console.log();
-console.log(`  ${YL(key)}`);
-console.log();
-console.log(GM('  Copy this key and give it to your customer.'));
-console.log(GM('  When they run "kantongkresek", paste this key to activate.'));
-console.log(GM('  The key is bound to the machine fingerprint above.\n'));
-
-// Also output machine data for records
-console.log(GM('  Machine data (for your records):'));
-console.log(`  ${GM(JSON.stringify(fpData))}`);
-console.log(`  ${GM('Fingerprint: ' + fpHex)}`);
+console.log(GM(`  ${args.count} license key(s) generated. Distribute to your customer.`));
+console.log(GM('  Key works on any machine — verification is signature-only.'));
 console.log();
