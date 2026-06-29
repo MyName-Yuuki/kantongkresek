@@ -6,6 +6,15 @@ import figlet from 'figlet';
 import ora from 'ora';
 import {execSync} from 'child_process';
 import {hrtime} from 'process';
+import {
+  generateLicense,
+  verifyLicense,
+  loadLicense,
+  saveLicense,
+  clearLicense,
+  getFingerprint,
+  fingerprintFromData,
+} from './lib/license.js';
 
 const GITHUB_USER = 'MyName-Yuuki';
 const GITHUB_REPO = 'kantongkresek';
@@ -134,9 +143,86 @@ async function footerPrompt() {
   }]);
 }
 
+// ---- LICENSE ACTIVATION ----
+async function ensureLicense(termWidth) {
+  const fpData = getFingerprint();
+  const fpHex = fingerprintFromData(fpData);
+
+  // Check existing stored license
+  const stored = loadLicense();
+  if (stored) {
+    const result = verifyLicense(stored.key, fpHex);
+    if (result.ok) {
+      console.log(chalk.hex('#10B981').bold('  License verified. Welcome back.\n'));
+      return true;
+    }
+    // Expired / tampered — wipe and re-prompt
+    try { clearLicense(); } catch {}
+    console.log(chalk.yellow('\n  Previous license expired or corrupted. Activating new key...\n'));
+  }
+
+  // Activation prompt
+  while (true) {
+    console.clear();
+    console.log(chalk.bgHex('#7C3AED').hex('#FFFFFF').bold('  KANTONGKRESEK LICENSE ACTIVATE  '));
+    console.log();
+    console.log(chalk.gray('  Masukkan lisensi KantongKresek yang sudah di-generate.'));
+    console.log(chalk.gray('  Format: KK-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX'));
+    console.log(chalk.gray('  Jika belum memiliki lisensi, hubungi administrator.'));
+    console.log();
+    console.log(chalk.gray(`  Machine fingerprint: ${fpHex.slice(0, 24)}...`));
+    console.log();
+
+    const {licenseKey} = await inquirer.prompt([{
+      type: 'input',
+      name: 'licenseKey',
+      message: chalk.bold('  License Key:'),
+      validate: (input) => {
+        const trimmed = (input || '').trim();
+        if (!trimmed) return 'License key tidak boleh kosong';
+        const blocks = trimmed.replace(/^KK-/, '').split('-');
+        if (blocks.length !== 8 || !blocks.every(s => /^[A-Z0-9]{4}$/.test(s))) {
+          return 'Format salah. Harap periksa lagi.';
+        }
+        return true;
+      },
+    }]);
+
+    const result = verifyLicense(licenseKey.trim(), fpHex);
+    if (result.ok) {
+      saveLicense({key: licenseKey.trim(), activatedAt: new Date().toISOString(), fingerprint: fpHex});
+      console.log();
+      console.log(boxen(
+        chalk.hex('#10B981').bold('  License activated successfully.') + '\n' +
+        chalk.gray('  Terima kasih menggunakan KantongKresek.'),
+        {padding: 1, margin: 1, borderStyle: 'round', borderColor: '#10B981'}
+      ));
+      console.log();
+      await new Promise(r => setTimeout(r, 2000));
+      return true;
+    }
+
+    console.log();
+    console.log(chalk.hex('#EF4444').bold(`  ✕ ${result.reason}`));
+    console.log();
+    await inquirer.prompt([{type: 'input', name: 'c', message: chalk.gray('Press Enter untuk coba lagi...')}]);
+  }
+}
+
 async function main() {
   const termWidth = process.stdout.columns || 80;
   const online = await checkOnline();
+
+  // ---- LICENSE GATE ----
+  const activated = await ensureLicense(termWidth);
+  if (!activated) {
+    console.log();
+    console.log(boxen(
+      chalk.hex('#EF4444').bold('  License check failed. Exiting.'),
+      {padding: 1, margin: 1, borderStyle: 'round', borderColor: '#EF4444'}
+    ));
+    process.exit(1);
+  }
 
   console.clear();
   console.log(await banner(termWidth));
