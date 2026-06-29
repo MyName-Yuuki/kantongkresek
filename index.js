@@ -23,6 +23,23 @@ const BRANCH      = 'main';
 const BASE_URL    = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${BRANCH}/scripts/`;
 const VERSION     = '1.0.0';
 
+// ---- Fetch latest version from remote (best effort) ----
+function fetchLatestVersion() {
+  try {
+    const raw = execSync(
+      `curl -fsSL --max-time 5 https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${BRANCH}/version.txt`,
+      {stdio: 'pipe', shell: '/bin/bash'}
+    ).toString().trim();
+    return /^v?\d+(?:\.\d+){0,2}$/.test(raw) ? raw.replace(/^v/, '') : null;
+  } catch {
+    return null;
+  }
+}
+const LATEST_VERSION = fetchLatestVersion() || VERSION;
+const DISPLAY_VERSION = LATEST_VERSION === VERSION
+  ? `v${VERSION}`
+  : `v${LATEST_VERSION} (this: v${VERSION})`;
+
 const MENU = [
   {key: '1', label: 'Install Base',         desc: 'PHP, Java, MariaDB — Full Environment',     script: 'install_base.sh'},
   {key: '2', label: 'Configurations',       desc: 'Nginx + PHP-FPM + Packages — Server Stack', scripts: ['configurations.sh', 'configurations_base_I.sh']},
@@ -49,7 +66,7 @@ function banner(termWidth) {
         lines.push(chalk.hex('#06B6D4').bold(line));
       }
       lines.push(chalk.hex('#06B6D4').bold(`  Kantong Kresek Installer — Base, Lib, System for PWServer`));
-      lines.push(chalk.gray(`  v${VERSION}  •  SSH Friendly  •  Server Deploy`));
+      lines.push(chalk.gray(`  ${DISPLAY_VERSION}  •  SSH Friendly  •  Server Deploy`));
       resolve(lines.join('\n'));
     });
   });
@@ -76,7 +93,7 @@ function statusBar(online, license) {
     chalk.gray('•'),
     chalk.hex('#F59E0B').bold(`host:${process.env.HOSTNAME || 'Kresek'}`),
     chalk.gray('•'),
-    chalk.hex('#9CA3AF').bold(`Author/${GITHUB_REPO}`),
+    chalk.hex('#9CA3AF').bold(`${DISPLAY_VERSION}`),
   ];
   return boxen(items.join('  '), {
     padding: {left: 1, right: 1},
