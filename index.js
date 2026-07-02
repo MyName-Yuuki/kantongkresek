@@ -411,6 +411,17 @@ async function main() {
   const termWidth = process.stdout.columns || 0;
   const online = await checkOnline();
 
+  // Pre-detect hostname for SSL menu default
+  const DEFAULT_DOMAIN = (() => {
+    try {
+      const h = os.hostname();
+      const f = execSync('hostname -f 2>/dev/null || hostname', {stdio: 'pipe'}).toString().trim();
+      if (f && f !== 'localhost' && !/^\d+\.\d+\.\d+\.\d+$/.test(f)) return f;
+      if (h && h !== 'localhost') return h;
+    } catch {}
+    return '';
+  })();
+
   // ---- ENSURE DATABASE FILES (fallback download from kresek.my.id) ----
   await ensureDatabases(online);
 
@@ -484,6 +495,57 @@ async function main() {
     }
 
     const found = MENU.find(m => m.key === menu);
+
+    // Menu 4: sub-pick SSL inputs before running
+    if (menu === '4') {
+      const {sslDomain, sslEmail, sslExtra} = await inquirer.prompt([{
+        type: 'input',
+        name: 'sslDomain',
+        message: chalk.bold('  Domain utama'),
+        prefix: chalk.hex('#7C3AED').bold('◆'),
+        default: DEFAULT_DOMAIN || '',
+        validate: (input) => {
+          const trimmed = (input || '').trim();
+          if (!trimmed) return 'Domain tidak boleh kosong';
+          return true;
+        },
+      }, {
+        type: 'input',
+        name: 'sslEmail',
+        message: chalk.bold('  Email SSL'),
+        prefix: chalk.hex('#7C3AED').bold('◆'),
+        default: `admin@${DEFAULT_DOMAIN || ''}`,
+        validate: (input) => {
+          const trimmed = (input || '').trim();
+          if (!trimmed) return 'Email tidak boleh kosong';
+          if (!trimmed.includes('@')) return 'Email tidak valid';
+          return true;
+        },
+      }, {
+        type: 'input',
+        name: 'sslExtra',
+        message: chalk.bold('  Domain tambahan (opsional)'),
+        prefix: chalk.hex('#7C3AED').bold('◆'),
+        default: '',
+        suffix: chalk.gray(' (pisah spasi)'),
+      }]);
+
+      const args = [
+        (sslDomain || '').trim(),
+        (sslEmail || '').trim(),
+        (sslExtra || '').trim(),
+      ];
+
+      console.log(chalk.gray(`\n  Running: Install SSL → ${args[0]} (${args[2] || 'no extra'})\n`));
+      try {
+        await runScripts([{script: 'install_ssl_certbot.sh', args}]);
+        console.log(chalk.hex('#10B981').bold('\n  ✓ Done!'));
+      } catch (e) {
+        console.log(chalk.hex('#EF4444').bold('\n  ✗ Script aborted.\n'));
+      }
+      await footerPrompt();
+      continue;
+    }
 
     // Menu 3: sub-pick database version before running
     if (menu === '3') {

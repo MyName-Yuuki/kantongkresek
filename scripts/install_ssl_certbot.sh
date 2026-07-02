@@ -111,7 +111,16 @@ print_box "  KANTONGKRESEK INSTALLER  "
 
 # ============================================================
 # STEP 1: Collect inputs
+# Arguments (optional, passed by npm installer):
+#   $1 = domain utama
+#   $2 = email SSL
+#   $3 = domain tambahan (space-separated, opsional)
+# Falls back to interactive prompts when run manually via `bash install_ssl_certbot.sh`.
 # ============================================================
+DOMAIN="${1:-}"
+EMAIL="${2:-}"
+EXTRA_DOMAINS="${3:-}"
+
 DEFAULT_DOMAIN=$(hostname -f 2>/dev/null)
 if [ -z "$DEFAULT_DOMAIN" ] || [ "$DEFAULT_DOMAIN" = "localhost" ]; then
     DEFAULT_DOMAIN=$(hostname -I 2>/dev/null | awk '{print $1}')
@@ -121,19 +130,25 @@ print_step "Let's Encrypt SSL Setup"
 print_info "Domain harus sudah mengarah (DNS A record) ke IP server ini."
 echo
 
-print_prompt "Domain utama" "[contoh: example.com]: "
-read DOMAIN
-DOMAIN=$(echo "$DOMAIN" | tr -d ' ')
-[ -z "$DOMAIN" ] && { print_error "Domain tidak boleh kosong"; exit 1; }
+if [ -z "$DOMAIN" ]; then
+    print_prompt "Domain utama" "[contoh: example.com]: "
+    read DOMAIN
+    DOMAIN=$(echo "$DOMAIN" | tr -d ' ')
+    [ -z "$DOMAIN" ] && { print_error "Domain tidak boleh kosong"; exit 1; }
+fi
 
-print_prompt "Email SSL" "[contoh: admin@example.com]: "
-read EMAIL
-EMAIL=$(echo "$EMAIL" | tr -d ' ')
-[ -z "$EMAIL" ] && { print_error "Email tidak boleh kosong"; exit 1; }
+if [ -z "$EMAIL" ]; then
+    print_prompt "Email SSL" "[contoh: admin@example.com]: "
+    read EMAIL
+    EMAIL=$(echo "$EMAIL" | tr -d ' ')
+    [ -z "$EMAIL" ] && { print_error "Email tidak boleh kosong"; exit 1; }
+fi
 
-print_prompt "Domain tambahan" "(opsional, pisahkan dengan spasi): "
-read EXTRA
-EXTRA_DOMAINS=$(echo "$EXTRA" | tr -d ' ')
+if [ -z "$EXTRA_DOMAINS" ]; then
+    print_prompt "Domain tambahan" "(opsional, pisahkan dengan spasi): "
+    read EXTRA
+    EXTRA_DOMAINS=$(echo "$EXTRA" | tr -d ' ')
+fi
 
 DOMAIN_ARGS="-d $DOMAIN"
 for d in $EXTRA_DOMAINS; do
@@ -141,9 +156,15 @@ for d in $EXTRA_DOMAINS; do
 done
 
 print_warn "Akan request cert untuk: $DOMAIN $EXTRA_DOMAINS"
-print_prompt "Lanjutkan?" "(y/N): "
-read CONFIRM
-[ "$CONFIRM" != "y" ] && [ "$CONFIRM" != "Y" ] && { print_warn "Dibatalkan"; exit 0; }
+
+if [ -n "${1:-}" ]; then
+    # Args provided (npm flow): skip confirmation prompt
+    print_info "Args dari npm installer — skip konfirmasi"
+else
+    print_prompt "Lanjutkan?" "(y/N): "
+    read CONFIRM
+    [ "$CONFIRM" != "y" ] && [ "$CONFIRM" != "Y" ] && { print_warn "Dibatalkan"; exit 0; }
+fi
 
 print_box_close 62
 

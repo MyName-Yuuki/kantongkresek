@@ -120,23 +120,27 @@ run_cmd "Set ownership on phpMyAdmin data" chown -R www-data:www-data /var/lib/p
 
 cat >/etc/nginx/snippets/phpmyadmin-dbkantong.conf <<'EOF'
 # phpMyAdmin served from /dbkantong
-location /dbkantong {
+location /dbkantong/ {
     alias /usr/share/phpmyadmin/;
     index index.php;
 
-    location ~ ^/dbkantong/(.+.(jpg|jpeg|gif|css|png|js|ico|html|xml|txt|svg|woff|woff2|ttf))$ {
+    # Static assets (images, css, js, fonts)
+    location ~ ^/dbkantong/(.+\.(jpg|jpeg|gif|css|png|js|ico|html|xml|txt|svg|woff|woff2|ttf|eot))$ {
         alias /usr/share/phpmyadmin/$1;
         access_log off;
         expires 30d;
+        log_not_found off;
     }
 
-    location ~ ^/dbkantong/(.+)$ {
+    # PHP scripts (route through FPM)
+    location ~ ^/dbkantong/(.+\.php)$ {
         alias /usr/share/phpmyadmin/$1;
         fastcgi_pass unix:/run/php/php8.4-fpm.sock;
         fastcgi_index index.php;
-        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param SCRIPT_FILENAME $request_filename;
         include fastcgi_params;
         fastcgi_read_timeout 300;
+        fastcgi_send_timeout 300;
     }
 }
 EOF

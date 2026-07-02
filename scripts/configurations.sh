@@ -151,7 +151,6 @@ print_info "Backing up old config"
 print_info "Writing Nginx config"
 cat > /etc/nginx/sites-available/default << 'EOF'
 server {
-
     listen 80 default_server;
     listen [::]:80 default_server;
 
@@ -161,16 +160,17 @@ server {
     index index.php index.html index.htm;
 
     charset utf-8;
-
     client_max_body_size 1024M;
 
     access_log /var/log/nginx/access.log;
     error_log  /var/log/nginx/error.log;
 
-    ##################################
-    ## Rewrite (pengganti .htaccess)
-    ##################################
+    # phpMyAdmin
+    include snippets/phpmyadmin-dbkantong.conf;
 
+    ##################################
+    ## Rewrite
+    ##################################
     location / {
         try_files $uri $uri/ /index.php?$query_string;
     }
@@ -178,52 +178,46 @@ server {
     ##################################
     ## PHP-FPM
     ##################################
-
     location ~ \.php$ {
-
         include snippets/fastcgi-php.conf;
-
         fastcgi_pass unix:/run/php/php8.4-fpm.sock;
-
-        fastcgi_index index.php;
-
-        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-
-        include fastcgi_params;
 
         fastcgi_read_timeout 300;
         fastcgi_send_timeout 300;
     }
 
     ##################################
-    ## Cache File
+    ## Static Files
     ##################################
-
-    location ~* \.(jpg|jpeg|gif|png|css|js|ico|svg|woff|woff2|ttf)$ {
+    location ~* \.(jpg|jpeg|png|gif|css|js|ico|svg|woff|woff2|ttf|eot)$ {
         expires 30d;
         access_log off;
+        log_not_found off;
     }
 
     ##################################
-    ## Block hidden files
+    ## Block Hidden Files (allow .well-known for ACME challenge)
     ##################################
-
-    location ~ /\. {
+    location ~ /\.(?!well-known).* {
         deny all;
     }
 
     ##################################
     ## Gzip
     ##################################
-
     gzip on;
+    gzip_vary on;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+
     gzip_types
         text/plain
         text/css
         application/json
         application/javascript
         application/xml
-        text/xml
+        application/xml+rss
+        application/xhtml+xml
         image/svg+xml;
 }
 EOF
